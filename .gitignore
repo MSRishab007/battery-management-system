@@ -1,0 +1,25 @@
+# --- PlatformIO Specific ---
+.pio/
+.pioenvs/
+.piolibdeps/
+*.d
+*.o
+
+# --- VS Code / Editor Specific ---
+.vscode/
+.idea/
+**/.DS_Store
+*.swp
+
+# --- OS Specific ---
+Thumbs.db
+Desktop.ini
+
+# --- Compiled Binaries (Just in case) ---
+*.bin
+*.elf
+*.hex
+*.map
+
+# --- Local User Configs  ---
+include/Secrets.h

@@ -1,59 +1,53 @@
 #include <Arduino.h>
-#include <Wire.h>
-#include <U8g2lib.h>
-#define XPOWERS_CHIP_AXP2101
-#include <XPowersLib.h>
-#define I2C_SDA             7
-#define I2C_SCL             6
-#define AXP2101_SLAVE_ADDRESS 0x34
-struct BmsPacket {
-    float value;
-} __attribute__((packed)); 
-XPowersPMU PMU;
-U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
-BmsPacket receivedData;
+#include "../include/DataTypes.h"
+#include "../include/Config.h"
+#include "Core/Protection.h"
+#include "HAL/Relays.h"
+#include "HAL/UartLink.h"
+#include "HAL/Display.h"         
+#include "Services/NetManager.h"
+
+BmsRecord systemRecord;
+uint32_t lastDebugPrint = 0;
+uint32_t lastMqttPublish = 0;
+uint32_t lastDisplayUpdate = 0;
 
 void setup() {
     Serial.begin(115200);
-    delay(2000); 
-    Wire.begin(I2C_SDA, I2C_SCL);
-    if (!PMU.begin(Wire, AXP2101_SLAVE_ADDRESS, I2C_SDA, I2C_SCL)) {
-        Serial.println("PMU Fail");
-        while(1) delay(100);
-    }
-    PMU.setALDO1Voltage(3300); PMU.enableALDO1();
-    PMU.setALDO4Voltage(3300); PMU.enableALDO4();
-    u8g2.begin();
-    u8g2.clearBuffer();
-    u8g2.setFont(u8g2_font_helvB10_tf);
-    u8g2.drawStr(0, 30, "READY.");
-    u8g2.sendBuffer();
+    delay(1000);
+    
+    Relays::init();
+    Display::init();             
+    NetManager::init(); 
+    
+    Serial.println("BMS V2.0 Initialized.");
 }
+
 void loop() {
-    // FIX: Check for the exact size of YOUR struct + 1 header byte
-    // sizeof(BmsPacket) is 4 bytes. + 1 Header = 5 bytes.
-    if (Serial.available() >= (sizeof(BmsPacket) + 1)) {
-        
-        // Check for Header
-        if (Serial.read() == 0xAA) {
-            
-            // Read 4 bytes (float)
-            Serial.readBytes((uint8_t*)&receivedData, sizeof(BmsPacket));
-            
-            // Debug
-            Serial.printf("Got Packet: %.2fV\n", receivedData.value);
-            
-            // Display
-            u8g2.clearBuffer();
-            u8g2.setFont(u8g2_font_helvB10_tf);
-            u8g2.drawStr(0, 12, "UART Read");
-            u8g2.drawLine(0, 15, 128, 15);
-            
-            u8g2.setFont(u8g2_font_6x13_tf);
-            u8g2.setCursor(0, 35);
-            u8g2.printf("Val: %.2f", receivedData.value);
-            
-            u8g2.sendBuffer();
-        }
+    uint32_t currentMillis = millis();
+
+    NetManager::loop();
+    UartLink::processIncoming(systemRecord);
+
+    Protection::runDiagnostics(systemRecord, currentMillis);
+    systemRecord.currentState = Protection::evaluateState(systemRecord);
+
+    Relays::setCharge(systemRecord.cmdChargeRelay);
+    Relays::setDischarge(systemRecord.cmdDischargeRelay);
+
+    // Update Display every 500ms
+    if (currentMillis - lastDisplayUpdate > 500) {
+        lastDisplayUpdate = currentMillis;
+        Display::update(systemRecord, NetManager::getTimeString(), NetManager::isWiFiConnected(), NetManager::isMqttConnected());
+    }
+
+    if (currentMillis - lastDebugPrint > 1000) {
+        lastDebugPrint = currentMillis;
+        Serial.printf("State: %d | Faults: 0x%02X\n", systemRecord.currentState, systemRecord.faultFlags);
+    }
+
+    if (currentMillis - lastMqttPublish > 3000) {
+        lastMqttPublish = currentMillis;
+        NetManager::publishTelemetry(systemRecord);
     }
 }

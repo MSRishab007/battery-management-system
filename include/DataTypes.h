@@ -3,47 +3,55 @@
 
 #include <stdint.h>
 
-// 1. SYSTEM STATES
+// States 
 enum BmsState {
-    STATE_BOOT,
-    STATE_IDLE,
+    STATE_BOOT = 0,
+    STATE_MAINTENANCE,
+    STATE_IDLE_STANDBY,
+    STATE_IDLE_LIGHT,
+    STATE_DEEP_SLEEP,
     STATE_PRE_CHARGE,
-    STATE_CHARGING,
     STATE_DISCHARGING,
-    STATE_FAULT_SOFT,
-    STATE_FAULT_HARD
+    STATE_FULL_DISCHARGE,
+    STATE_CHARGE_RECOVERY,
+    STATE_CHARGE_BULK,
+    STATE_BALANCING,
+    STATE_FULL_IDLE,
+    STATE_FAULT         
 };
 
-// 2. FAULT CODES 
+//Fault Flags 
 enum FaultFlags {
     FAULT_NONE          = 0x00,
     FAULT_CELL_OVP      = 0x01, // Over-voltage
     FAULT_CELL_UVP      = 0x02, // Under-voltage
-    FAULT_OVER_CURRENT  = 0x04,
-    FAULT_OVER_TEMP     = 0x08,
-    FAULT_TEMP_DELTA    = 0x10, // Charge Temp vs Discharge Temp mismatch
-    FAULT_STALE_DATA    = 0x20  // Python/UART stopped sending
+    FAULT_OVER_CURRENT  = 0x04, // Over-current
+    FAULT_OVER_TEMP     = 0x08, // Over-temperature
+    FAULT_TEMP_DELTA    = 0x10, //Temperature delta between charge/discharge sensors too high
+    FAULT_STALE_DATA    = 0x20  // STALE_DATA: No UART updates 
 };
 
-// 3. THE SENSOR OBJECT 
+
 struct Sensor {
     float value;
     uint32_t lastUpdate;
 };
 
-// 4. THE MASTER RECORD
+// BMS MAster Record 
 struct BmsRecord {
-    // Inputs
+    // Inputs 
     Sensor cellVolts[4];
     Sensor currentA;
     Sensor tempCharge;
     Sensor tempDischarge;
-    bool chargerPhysicallyConnected;
+    bool chargerPhysicallyConnected; 
     
-    // Outputs 
+    // Core Logic Outputs 
     BmsState currentState;
     uint8_t faultFlags;
-    float stateOfCharge; // Percentage 0-100%
+    
+    float stateOfCharge;          //Between 0-100% 
+    float capacityRemaining_mAh;  
     
     // Actuators
     bool cmdChargeRelay;

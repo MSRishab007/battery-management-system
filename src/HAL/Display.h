@@ -2,7 +2,6 @@
 #define DISPLAY_H
 
 #include <Arduino.h>
-#include <U8g2lib.h>
 #include "../../include/DataTypes.h"
 
 class Display {

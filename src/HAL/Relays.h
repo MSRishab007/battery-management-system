@@ -2,9 +2,12 @@
 #define RELAYS_H
 
 #include <Arduino.h>
-#include "../include/Config.h"
 
 class Relays {
+private:
+    static bool currentChargeState;
+    static bool currentDischargeState;
+
 public:
     static void init();
     static void setCharge(bool state);

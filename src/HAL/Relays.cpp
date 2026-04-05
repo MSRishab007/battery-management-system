@@ -1,19 +1,30 @@
 #include "Relays.h"
+#include "../../include/Config.h" 
+
+bool Relays::currentChargeState = false;
+bool Relays::currentDischargeState = false;
 
 void Relays::init() {
-    pinMode(PIN_RELAY_CHARGE, OUTPUT);
-    pinMode(PIN_RELAY_DISCHARGE, OUTPUT);
+    pinMode(Config::PIN_RELAY_CHARGE, OUTPUT);
+    pinMode(Config::PIN_RELAY_DISCHARGE, OUTPUT);
     
-    // Default to safe state (OPEN)
-    setCharge(false);
-    setDischarge(false);
+    digitalWrite(Config::PIN_RELAY_CHARGE, LOW);
+    digitalWrite(Config::PIN_RELAY_DISCHARGE, LOW);
+    
+    currentChargeState = false;
+    currentDischargeState = false;
 }
 
 void Relays::setCharge(bool state) {
-    // If state is true, write HIGH. Otherwise LOW.
-    digitalWrite(PIN_RELAY_CHARGE, state ? HIGH : LOW);
+    if (currentChargeState != state) {
+        digitalWrite(Config::PIN_RELAY_CHARGE, state ? HIGH : LOW);
+        currentChargeState = state; 
+    }
 }
 
 void Relays::setDischarge(bool state) {
-    digitalWrite(PIN_RELAY_DISCHARGE, state ? HIGH : LOW);
+    if (currentDischargeState != state) {
+        digitalWrite(Config::PIN_RELAY_DISCHARGE, state ? HIGH : LOW);
+        currentDischargeState = state;
+    }
 }

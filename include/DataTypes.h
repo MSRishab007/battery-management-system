@@ -1,61 +1,60 @@
-#ifndef DATATYPES_H
-#define DATATYPES_H
-
+#pragma once
 #include <stdint.h>
 
-// States 
-enum BmsState {
+// The Lean 10-State Architecture
+enum SystemState {
     STATE_BOOT = 0,
     STATE_MAINTENANCE,
-    STATE_IDLE_STANDBY,
-    STATE_IDLE_LIGHT,
+    STATE_IDLE,
     STATE_DEEP_SLEEP,
-    STATE_PRE_CHARGE,
     STATE_DISCHARGING,
-    STATE_FULL_DISCHARGE,
     STATE_CHARGE_RECOVERY,
     STATE_CHARGE_BULK,
     STATE_BALANCING,
     STATE_FULL_IDLE,
-    STATE_FAULT         
+    STATE_FAULT
 };
 
-//Fault Flags 
-enum FaultFlags {
-    FAULT_NONE          = 0x00,
-    FAULT_CELL_OVP      = 0x01, // Over-voltage
-    FAULT_CELL_UVP      = 0x02, // Under-voltage
-    FAULT_OVER_CURRENT  = 0x04, // Over-current
-    FAULT_OVER_TEMP     = 0x08, // Over-temperature
-    FAULT_TEMP_DELTA    = 0x10, //Temperature delta between charge/discharge sensors too high
-    FAULT_STALE_DATA    = 0x20  // STALE_DATA: No UART updates 
+// Fault Bitmask
+enum FaultFlags : uint32_t {
+    FAULT_NONE                  = 0x00000000,
+    FAULT_OVER_VOLTAGE          = 0x00000001,
+    FAULT_UNDER_VOLTAGE         = 0x00000002,
+    FAULT_TEMP_DELTA            = 0x00000004, 
+    FAULT_OVER_TEMP             = 0x00000008,
+    FAULT_STALE_DATA            = 0x00000010, 
+    FAULT_CONTACTOR_WELDED      = 0x00000020
 };
 
+constexpr int NUM_CELLS = 4; 
+constexpr int NUM_TEMPS = 2;
 
+// The Granular Zero-Trust Wrapper
 struct Sensor {
-    float value;
-    uint32_t lastUpdate;
+    float value = 0.0f;
+    uint32_t lastUpdate = 0;
 };
 
-// BMS MAster Record 
+// THE MASTER RECORD
 struct BmsRecord {
-    // Inputs 
-    Sensor cellVolts[4];
-    Sensor currentA;
-    Sensor tempCharge;
-    Sensor tempDischarge;
-    bool chargerPhysicallyConnected; 
+    // --- Inputs (Wrapped in Sensor struct) ---
+    Sensor cellVoltages[NUM_CELLS];
+    Sensor packVoltage;
+    Sensor current;
+    Sensor temperatures[NUM_TEMPS];
     
-    // Core Logic Outputs 
-    BmsState currentState;
-    uint8_t faultFlags;
+    bool chargerConnected = false;
     
-    float stateOfCharge;          //Between 0-100% 
-    float capacityRemaining_mAh;  
+    // --- State & Calculations ---
+    SystemState currentState = STATE_BOOT;
+    float stateOfCharge = 0.0f;
+    float vMax = 0.0f;
+    float vMin = 0.0f;
+    uint32_t faultFlags = FAULT_NONE;
     
-    // Actuators
-    bool cmdChargeRelay;
-    bool cmdDischargeRelay;
+    // --- Outputs ---
+    bool cmdChargeRelay = false;
+    bool cmdDischargeRelay = false;
+    bool cmdRecoveryRelay = false;       
+    bool balanceEnables[NUM_CELLS] = {false}; 
 };
-
-#endif

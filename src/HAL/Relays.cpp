@@ -1,30 +1,67 @@
 #include "Relays.h"
-#include "../../include/Config.h" 
 
-bool Relays::currentChargeState = false;
-bool Relays::currentDischargeState = false;
+#ifdef ARDUINO
+#include <Arduino.h>
+
+constexpr int PIN_RELAY_CHARGE    = 15;
+constexpr int PIN_RELAY_DISCHARGE = 2;
+constexpr int PIN_RELAY_RECOVERY  = 4;
+constexpr int PIN_BALANCE_CELL_1  = 16;
+constexpr int PIN_BALANCE_CELL_2  = 17;
+constexpr int PIN_BALANCE_CELL_3  = 18;
+constexpr int PIN_BALANCE_CELL_4  = 19;
+
+const int BALANCE_PINS[NUM_CELLS] = {
+    PIN_BALANCE_CELL_1, PIN_BALANCE_CELL_2, 
+    PIN_BALANCE_CELL_3, PIN_BALANCE_CELL_4
+};
+#endif
+
+
+#ifndef ARDUINO
+bool Relays::mockChargePin = false;
+bool Relays::mockDischargePin = false;
+bool Relays::mockRecoveryPin = false;
+bool Relays::mockBalancePins[NUM_CELLS] = {false};
+#endif
 
 void Relays::init() {
-    pinMode(Config::PIN_RELAY_CHARGE, OUTPUT);
-    pinMode(Config::PIN_RELAY_DISCHARGE, OUTPUT);
-    
-    digitalWrite(Config::PIN_RELAY_CHARGE, LOW);
-    digitalWrite(Config::PIN_RELAY_DISCHARGE, LOW);
-    
-    currentChargeState = false;
-    currentDischargeState = false;
+#ifdef ARDUINO
+    pinMode(PIN_RELAY_CHARGE, OUTPUT);
+    pinMode(PIN_RELAY_DISCHARGE, OUTPUT);
+    pinMode(PIN_RELAY_RECOVERY, OUTPUT);
+    for(int i = 0; i < NUM_CELLS; i++) {
+        pinMode(BALANCE_PINS[i], OUTPUT);
+    }
+    digitalWrite(PIN_RELAY_CHARGE, LOW);
+    digitalWrite(PIN_RELAY_DISCHARGE, LOW);
+    digitalWrite(PIN_RELAY_RECOVERY, LOW);
+    for(int i = 0; i < NUM_CELLS; i++) {
+        digitalWrite(BALANCE_PINS[i], LOW);
+    }
+#else
+    mockChargePin = false;
+    mockDischargePin = false;
+    mockRecoveryPin = false;
+    for(int i = 0; i < NUM_CELLS; i++) mockBalancePins[i] = false;
+#endif
 }
 
-void Relays::setCharge(bool state) {
-    if (currentChargeState != state) {
-        digitalWrite(Config::PIN_RELAY_CHARGE, state ? HIGH : LOW);
-        currentChargeState = state; 
+void Relays::update(const BmsRecord& record) {
+#ifdef ARDUINO
+    digitalWrite(PIN_RELAY_CHARGE, record.cmdChargeRelay ? HIGH : LOW);
+    digitalWrite(PIN_RELAY_DISCHARGE, record.cmdDischargeRelay ? HIGH : LOW);
+    digitalWrite(PIN_RELAY_RECOVERY, record.cmdRecoveryRelay ? HIGH : LOW);
+    
+    for(int i = 0; i < NUM_CELLS; i++) {
+        digitalWrite(BALANCE_PINS[i], record.balanceEnables[i] ? HIGH : LOW);
     }
-}
-
-void Relays::setDischarge(bool state) {
-    if (currentDischargeState != state) {
-        digitalWrite(Config::PIN_RELAY_DISCHARGE, state ? HIGH : LOW);
-        currentDischargeState = state;
+#else
+    mockChargePin = record.cmdChargeRelay;
+    mockDischargePin = record.cmdDischargeRelay;
+    mockRecoveryPin = record.cmdRecoveryRelay;
+    for(int i = 0; i < NUM_CELLS; i++) {
+        mockBalancePins[i] = record.balanceEnables[i];
     }
+#endif
 }

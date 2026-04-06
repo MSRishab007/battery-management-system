@@ -1,17 +1,17 @@
-#ifndef RELAYS_H
-#define RELAYS_H
-
-#include <Arduino.h>
+#pragma once
+#include "../../include/DataTypes.h"
 
 class Relays {
-private:
-    static bool currentChargeState;
-    static bool currentDischargeState;
-
 public:
     static void init();
-    static void setCharge(bool state);
-    static void setDischarge(bool state);
-};
+    
+    static void update(const BmsRecord& record);
 
+
+#ifndef ARDUINO
+    static bool mockChargePin;
+    static bool mockDischargePin;
+    static bool mockRecoveryPin;
+    static bool mockBalancePins[NUM_CELLS];
 #endif
+};

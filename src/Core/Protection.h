@@ -1,13 +1,9 @@
-#ifndef PROTECTION_H
-#define PROTECTION_H
+#pragma once
 
-#include "../../include/DataTypes.h"
-#include "../../include/Config.h"
+#include "DataTypes.h"
+#include "Config.h"
 
 class Protection {
 public:
-    // Only does one thing: mathematically validates limits and sets faultFlags.
-    static void runDiagnostics(BmsRecord& record);
+    static void runDiagnostics(BmsRecord& record, uint32_t currentMillis);
 };
-
-#endif

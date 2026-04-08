@@ -3,7 +3,7 @@ import time
 import random
 
 # --- CONFIGURATION ---
-PORT = 'COM7'     # Change to your ESP32's COM port
+PORT = 'COM7' 
 BAUD = 115200
 
 # --- SCENARIO TESTING ---
@@ -12,8 +12,7 @@ BAUD = 115200
 # 2 = Over-Voltage Fault (Triggers OVP)
 # 3 = Over-Temperature Fault (Triggers OTP)
 # 4 = Stale Data Fault (Drops V2 from the frame)
-ACTIVE_SCENARIO = 0  
-
+ACTIVE_SCENARIO = 0
 def calculate_checksum(payload):
     """Calculates the XOR checksum of a string (NMEA style)"""
     checksum = 0
@@ -50,7 +49,7 @@ try:
             "v2": round(random.uniform(3.90, 4.00), 2),
             "v3": round(random.uniform(3.90, 4.00), 2),
             "v4": round(random.uniform(3.90, 4.00), 2),
-            "c":  round(random.uniform(1.0, 3.0), 2),  # Positive = Charging
+            "c":  round(random.uniform(100.0, 200.0), 2),  # Positive = Charging
             "t1": round(random.uniform(30.0, 32.0), 1),
             "t2": round(random.uniform(30.0, 32.0), 1),
             "CHG": 1  # 1 = Charger Connected

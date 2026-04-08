@@ -12,6 +12,41 @@
 
 static XPowersPMU PMU;
 static U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
+#ifdef ARDUINO
+String getStateString(uint8_t stateCode) {
+    switch(stateCode) {
+        case 0: return "BOOT";
+        case 1: return "STANDBY";
+        case 2: return "CHARGE";
+        case 3: return "DISCHARGE";
+        case 4: return "FULL_IDLE";
+        case 5: return "DEEP_SLEEP";
+        case 6: return "BALANCING";
+        case 7: return "RECOVERY";
+        case 8: return "LIMP_MODE";
+        case 9: return "FAULT!";
+        default: return "UNKNOWN (" + String(stateCode) + ")";
+    }
+}
+
+String getFaultString(uint32_t faultFlags) { 
+    if (faultFlags == 0) return "OK";
+    
+    String out = "0x";
+    if (faultFlags < 16) out += "0"; 
+    out += String(faultFlags, HEX) + " [";
+    
+    if (faultFlags & FAULT_OVER_VOLTAGE)      out += "OVP ";
+    if (faultFlags & FAULT_UNDER_VOLTAGE)     out += "UVP ";
+    if (faultFlags & FAULT_TEMP_DELTA)        out += "dTMP "; 
+    if (faultFlags & FAULT_OVER_TEMP)         out += "OTP ";
+    if (faultFlags & FAULT_STALE_DATA)        out += "STALE "; 
+    if (faultFlags & FAULT_CONTACTOR_WELDED)  out += "WELD ";  
+    
+    out += "]";
+    return out;
+}
+#endif
 
 void Display::init() {
     Wire.begin(I2C_SDA, I2C_SCL);
@@ -42,7 +77,7 @@ void Display::update(const BmsRecord& record, const String& timeStr,
             u8g2.setDrawColor(0); // Draw text in black over white box
         }
         u8g2.setFont(u8g2_font_helvB14_tf);
-        u8g2.drawStr(25, 30, "FAULT!");
+        u8g2.drawStr(25, 30, "FAULT");
         u8g2.setFont(u8g2_font_6x13_tf);
         u8g2.setCursor(20, 50);
         u8g2.printf("CODE: 0x%02X", record.faultFlags);
@@ -82,13 +117,11 @@ void Display::update(const BmsRecord& record, const String& timeStr,
     u8g2.drawRFrame(108, 16, 20, 34, 2); // Body
     u8g2.drawBox(114, 13, 8, 3);         // Positive terminal
     
-    // Fill the battery based on estimated SoC (using simplistic voltage mapping for now)
+
     // Map vMin from 3.0V (0%) to 4.2V (100%)
-    float estimatedSoC = (record.vMin - 3.0f) / 1.2f; 
-    if (estimatedSoC > 1.0f) estimatedSoC = 1.0f;
-    if (estimatedSoC < 0.0f) estimatedSoC = 0.0f;
+    float displaySoC = record.stateOfCharge / 100.0f;
     
-    int fillPixels = (int)(estimatedSoC * 30.0f);
+    int fillPixels = (int)(displaySoC * 30.0f);
     u8g2.drawBox(110, 48 - fillPixels, 16, fillPixels);
 
     // Charging Animation Chevron

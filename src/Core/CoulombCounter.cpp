@@ -1,55 +1,60 @@
 #include "CoulombCounter.h"
-#include <Arduino.h>
 
-uint32_t CoulombCounter::lastUpdateTimeMs = 0;
+uint32_t CoulombCounter::lastUpdateMillis = 0;
 
 void CoulombCounter::init(BmsRecord& record) {
-    lastUpdateTimeMs = millis();
-    if (record.capacityRemaining_mAh >= 0.0) {
-        record.stateOfCharge = (record.capacityRemaining_mAh / Config::PACK_CAPACITY_MAH) * 100.0;
+    if (record.stateOfCharge >= 0.0f) {
+        record.capacityRemaining_mAh = (record.stateOfCharge / 100.0f) * Config::PACK_CAPACITY_MAH;
+    } else {
+        record.capacityRemaining_mAh = -1.0f;
+    }
+    
+    lastUpdateMillis = 0;
+}
+
+void CoulombCounter::update(BmsRecord& record, uint32_t currentMillis) {
+    if (lastUpdateMillis == 0) {
+        lastUpdateMillis = currentMillis;
         return; 
     }
 
-    float packMaxV = Config::OVP_LIMIT * 4.0;
-    float packMinV = Config::UVP_LIMIT * 4.0;
-    
-    if (record.packVoltage <= packMinV) {
-        record.stateOfCharge = 0.0;
-    } else if (record.packVoltage >= packMaxV) {
-        record.stateOfCharge = 100.0;
-    } else {
-        record.stateOfCharge = ((record.packVoltage - packMinV) / (packMaxV - packMinV)) * 100.0;
+    uint32_t deltaMs = currentMillis - lastUpdateMillis;
+    lastUpdateMillis = currentMillis;
+
+    if (record.capacityRemaining_mAh < 0.0f) {
+        if (record.vMin > 1.0f) {
+            record.stateOfCharge = estimateSocFromVoltage(record.vMin);
+            record.capacityRemaining_mAh = (record.stateOfCharge / 100.0f) * Config::PACK_CAPACITY_MAH;
+        } else {
+            return; 
+        }
     }
 
-    record.capacityRemaining_mAh = (record.stateOfCharge / 100.0) * Config::PACK_CAPACITY_MAH;
+    float delta_mAh = (record.current.value * deltaMs) / 3600.0f;
+    record.capacityRemaining_mAh += delta_mAh;
+    record.stateOfCharge = (record.capacityRemaining_mAh / Config::PACK_CAPACITY_MAH) * 100.0f;
+
+    if (record.currentState == STATE_FULL_IDLE) {
+        record.capacityRemaining_mAh = Config::PACK_CAPACITY_MAH;
+        record.stateOfCharge = 100.0f;
+    }
+    
+    if (record.currentState == STATE_DEEP_SLEEP) {
+        record.capacityRemaining_mAh = 0.0f;
+        record.stateOfCharge = 0.0f;
+    }
+
+    if (record.stateOfCharge > 100.0f) record.stateOfCharge = 100.0f;
+    if (record.stateOfCharge < 0.0f) record.stateOfCharge = 0.0f;
 }
 
-void CoulombCounter::update(BmsRecord& record) {
-    uint32_t currentTimeMs = millis();
-    uint32_t deltaMs = currentTimeMs - lastUpdateTimeMs;
- 
-    if (deltaMs > 5000) {
-        lastUpdateTimeMs = currentTimeMs;
-        return;
-    }
-
-    float current = record.currentA.value;
-
-    if (abs(current) < CURRENT_NOISE_FLOOR) {
-        current = 0.0;
-    }
-
-    float delta_mAh = (current * deltaMs) / 3600.0;
-
-    record.capacityRemaining_mAh += delta_mAh;
-
-    if (record.capacityRemaining_mAh > Config::PACK_CAPACITY_MAH) {
-        record.capacityRemaining_mAh = Config::PACK_CAPACITY_MAH;
-    } else if (record.capacityRemaining_mAh < 0.0) {
-        record.capacityRemaining_mAh = 0.0;
-    }
-
-    record.stateOfCharge = (record.capacityRemaining_mAh / Config::PACK_CAPACITY_MAH) * 100.0;
-
-    lastUpdateTimeMs = currentTimeMs;
+float CoulombCounter::estimateSocFromVoltage(float vMin) {
+    if (vMin >= Config::VOLTAGE_FULL) return 100.0f;
+    if (vMin <= Config::VOLTAGE_DEEP_SLEEP) return 0.0f;
+    
+    float soc = ((vMin - Config::VOLTAGE_RECOVERY_LIMIT) / 
+                 (Config::VOLTAGE_FULL - Config::VOLTAGE_RECOVERY_LIMIT)) * 100.0f;
+                 
+    if (soc < 0.0f) soc = 0.0f;
+    return soc;
 }

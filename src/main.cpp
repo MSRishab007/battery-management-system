@@ -1,89 +1,82 @@
 #include <Arduino.h>
+
+// Include our centralized Record and Config
 #include "../include/DataTypes.h"
 #include "../include/Config.h"
 
-// Core Logic
+// Include Core Brain
 #include "Core/Protection.h"
 #include "Core/StateManager.h"
 #include "Core/CoulombCounter.h"
 
-// HAL & Services
-#include "HAL/Relays.h"
+// Include Hardware Senses (HAL)
 #include "HAL/UartLink.h"
-#include "HAL/Display.h"         
-#include "Services/NetManager.h"
-// #include "Services/StorageManager.h
+#include "HAL/Relays.h"
+#include "HAL/Display.h"
 
-BmsRecord systemRecord;
-uint32_t lastDebugPrint = 0;
-uint32_t lastMqttPublish = 0;
-uint32_t lastDisplayUpdate = 0;
+// Include External Services
+#include "Services/NetManager.h"
+#include "Services/StorageManager.h"
+BmsRecord record;
+
+uint32_t lastCoreTick = 0;
+uint32_t lastDisplayTick = 0;
+uint32_t lastTelemetryTick = 0;
 
 void setup() {
+    delay(3000);
+    // 1. Boot the Physical Serial Port for Python SIL
     Serial.begin(115200);
-    delay(1000);
-    
-    // Configure the physical reset button for hard faults
-    pinMode(Config::PIN_BUTTON_RESET, INPUT_PULLUP);
-    
-    // Initialize Core Logic
-    // StorageManager::init(systemRecord);
-    StateManager::init(systemRecord);
-    systemRecord.capacityRemaining_mAh = -1.0; 
-    CoulombCounter::init(systemRecord);
-    
-    // Initialize Hardware & Services
+    delay(1000); // Give the UART bus a moment to stabilize
+    Serial.println("\n--- ESP32 BMS CONDUCTOR BOOTING ---");
+
+    // 2. Initialize Hardware Abstraction Layer
+    UartLink::init();
     Relays::init();
-    Display::init();             
-    NetManager::init(); 
-    
-    Serial.println("BMS V2.0 Initialized.");
+    Display::init();
+
+    // 3. Initialize Services (Network & Memory)
+    NetManager::init();
+    StorageManager::init(record);
+
+    // 4. Initialize Core Logic (Anchors the Coulomb Counter)
+    CoulombCounter::init(record);
+
+    Serial.println("[CONDUCTOR] Boot Sequence Complete. Entering Main Loop.");
 }
 
 void loop() {
     uint32_t currentMillis = millis();
 
-    // 1. READ INPUTS
-    NetManager::loop();
-    UartLink::processIncoming(systemRecord);
+    NetManager::loop(currentMillis);
+    
+    // Pulls data off the UART wire the millisecond it arrives
+    UartLink::readSerial(record, currentMillis);
+    if (currentMillis - lastCoreTick >= 50) {
+        lastCoreTick = currentMillis;
 
-    // Manual Fault Reset (LilyGo Button)
-    if (digitalRead(Config::PIN_BUTTON_RESET) == LOW) {
-        Serial.println("Manual Reset: Clearing faults...");
-        systemRecord.faultFlags = FAULT_NONE;
-        // StorageManager::clearFaults(); 
-        delay(200); 
+        Protection::runDiagnostics(record, currentMillis);
+        CoulombCounter::update(record, currentMillis);
+        StateManager::evaluateState(record);
+        Relays::update(record);
+        StorageManager::update(record, currentMillis);
     }
 
-    // 2. CORE LOGIC
-    // Gatekeeper -> Brain -> Analytics
-    Protection::runDiagnostics(systemRecord);
-    StateManager::evaluateState(systemRecord);
-    CoulombCounter::update(systemRecord);
-
-    // 3. WRITE OUTPUTS
-    StorageManager::update(systemRecord);
-    Relays::setCharge(systemRecord.cmdChargeRelay);
-    Relays::setDischarge(systemRecord.cmdDischargeRelay);
-
-    // Update Display every 500ms
-    if (currentMillis - lastDisplayUpdate > 500) {
-        lastDisplayUpdate = currentMillis;
-        Display::update(systemRecord, NetManager::getTimeString(), NetManager::isWiFiConnected(), NetManager::isMqttConnected());
+    if (currentMillis - lastDisplayTick >= 250) {
+        lastDisplayTick = currentMillis;
+        
+        Display::update(
+            record, 
+            NetManager::getTimeString(), 
+            NetManager::isWiFiConnected(), 
+            NetManager::isMqttConnected(),
+            currentMillis
+        );
     }
 
-    // Serial Debug Print every 1000ms
-    if (currentMillis - lastDebugPrint > 1000) {
-        lastDebugPrint = currentMillis;
-        Serial.printf("State: %d | Faults: 0x%02X | SoC: %.1f%%\n", 
-            systemRecord.currentState, 
-            systemRecord.faultFlags, 
-            systemRecord.stateOfCharge);
-    }
-
-    // MQTT Publish every 3000ms
-    if (currentMillis - lastMqttPublish > 3000) {
-        lastMqttPublish = currentMillis;
-        NetManager::publishTelemetry(systemRecord);
+    if (currentMillis - lastTelemetryTick >= 1000) {
+        lastTelemetryTick = currentMillis;
+        
+        NetManager::publishTelemetry(record);
     }
 }

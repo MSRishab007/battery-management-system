@@ -57,4 +57,6 @@ struct BmsRecord {
     bool cmdDischargeRelay = false;
     bool cmdRecoveryRelay = false;       
     bool balanceEnables[NUM_CELLS] = {false}; 
+
+    float capacityRemaining_mAh = -1.0f; // -1.0 means 
 };

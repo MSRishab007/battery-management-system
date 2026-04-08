@@ -1,55 +1,96 @@
 #include "StorageManager.h"
+#include <cmath>
 
-Preferences StorageManager::preferences;
+#ifdef ARDUINO
+#include <Arduino.h>
+#include <Preferences.h>
+static Preferences preferences;
+#endif
+
 uint32_t StorageManager::lastSaveTime = 0;
-uint8_t StorageManager::lastSavedFaults = FAULT_NONE;
-float StorageManager::lastSavedCapacity = 0.0;
+uint32_t StorageManager::lastSavedFaults = FAULT_NONE;
+float StorageManager::lastSavedSoC = 0.0f;
 
-void StorageManager::init(BmsRecord& record) {
-    // Open the NVS namespace "bms_data". The 'false' means Read/Write mode.
-    preferences.begin("bms_data", false);
-    
-    // 1. Load Faults
-    // If the key "faults" doesn't exist (first boot ever), default to FAULT_NONE (0x00)
-    record.faultFlags = preferences.getUChar("faults", FAULT_NONE);
+#ifndef ARDUINO
+uint32_t StorageManager::mockFlashFaults = FAULT_NONE;
+float StorageManager::mockFlashSoC = -1.0f;
+#endif
+
+void StorageManager::init(BmsRecord &record)
+{
+#ifdef ARDUINO
+    if (Config::ENABLE_NVS_STORAGE)
+    {
+        preferences.begin("bms_data", false);
+        record.faultFlags = preferences.getUChar("faults", FAULT_NONE);
+        record.stateOfCharge = preferences.getFloat("soc", -1.0f);
+    }
+    else
+    {
+        Serial.println("[STORAGE] NVS Writes DISABLED via Config.h");
+    }
+#else
+    record.faultFlags = mockFlashFaults;
+    record.stateOfCharge = mockFlashSoC;
+#endif
+
     lastSavedFaults = record.faultFlags;
-    
-    if (record.faultFlags != FAULT_NONE) {
-        Serial.printf("[STORAGE] WARNING: Loaded active fault from memory: 0x%02X\n", record.faultFlags);
-    }
-    
-    // 2. Load Capacity
-    // Default to -1.0 so the CoulombCounter knows if it needs to guess the SoC from voltage
-    record.capacityRemaining_mAh = preferences.getFloat("cap_mah", -1.0);
-    lastSavedCapacity = record.capacityRemaining_mAh;
-    
-    lastSaveTime = millis();
-    Serial.println("[STORAGE] NVS Data Loaded.");
+    lastSavedSoC = record.stateOfCharge;
+    lastSaveTime = 0;
 }
 
-void StorageManager::update(const BmsRecord& record) {
-    // 1. INSTANT SAVE ON FAULTS (Safety Critical)
-    // If a new fault appears, save it to flash memory immediately.
-    if (record.faultFlags != lastSavedFaults) {
-        preferences.putUChar("faults", record.faultFlags);
+void StorageManager::update(const BmsRecord &record, uint32_t currentMillis)
+{
+    // 1. INSTANT SAVE ON FAULTS
+    if (record.faultFlags != lastSavedFaults)
+    {
         lastSavedFaults = record.faultFlags;
-        Serial.printf("[STORAGE] Fault State Saved to NVS: 0x%02X\n", lastSavedFaults);
-    }
-    
-    // 2. PERIODIC SAVE FOR CAPACITY (Wear Leveling)
-    if (millis() - lastSaveTime > SAVE_INTERVAL_MS) {
-        // Only burn a write cycle if the capacity actually changed by more than 1 mAh
-        if (abs(record.capacityRemaining_mAh - lastSavedCapacity) > 1.0) {
-            preferences.putFloat("cap_mah", record.capacityRemaining_mAh);
-            lastSavedCapacity = record.capacityRemaining_mAh;
-            Serial.printf("[STORAGE] Capacity saved: %.0f mAh\n", lastSavedCapacity);
+
+#ifdef ARDUINO
+        if (Config::ENABLE_NVS_STORAGE)
+        {
+            preferences.putUChar("faults", lastSavedFaults);
         }
-        lastSaveTime = millis();
+        Serial.printf("[STORAGE] Fault State updated: 0x%02X\n", lastSavedFaults);
+#else
+        mockFlashFaults = lastSavedFaults;
+#endif
+    }
+
+    // 2. PERIODIC SAVE FOR SOC (Wear Leveling)
+    if (currentMillis - lastSaveTime >= Config::SAVE_INTERVAL_MS)
+    {
+        // Only burn a write cycle if SoC changed by > 1%
+        if (std::abs(record.stateOfCharge - lastSavedSoC) >= 1.0f)
+        {
+            lastSavedSoC = record.stateOfCharge;
+
+#ifdef ARDUINO
+            if (Config::ENABLE_NVS_STORAGE)
+            {
+                preferences.putFloat("soc", lastSavedSoC);
+            }
+            Serial.printf("[STORAGE] SoC saved: %.0f%%\n", lastSavedSoC);
+#else
+            mockFlashSoC = lastSavedSoC;
+#endif
+            // ONLY reset the timer after a successful save!
+            lastSaveTime = currentMillis;
+        }
     }
 }
-
-void StorageManager::clearFaults() {
-    preferences.putUChar("faults", FAULT_NONE);
+void StorageManager::clearFaults(BmsRecord &record)
+{
+    record.faultFlags = FAULT_NONE;
     lastSavedFaults = FAULT_NONE;
-    Serial.println("[STORAGE] Faults cleared from NVS memory.");
+
+#ifdef ARDUINO
+    if (Config::ENABLE_NVS_STORAGE)
+    {
+        preferences.putUChar("faults", FAULT_NONE);
+    }
+    Serial.println("[STORAGE] Faults cleared.");
+#else
+    mockFlashFaults = FAULT_NONE;
+#endif
 }

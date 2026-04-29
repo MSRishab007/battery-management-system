@@ -5,7 +5,8 @@ namespace Config {
     // =================================================================
     // 1. BATTERY HARDWARE SPECIFICATIONS
     // =================================================================
-    constexpr float PACK_CAPACITY_MAH = 5000.0f;   
+    // constexpr float PACK_CAPACITY_MAH = 5000.0f;   
+    constexpr float PACK_CAPACITY_MAH = 1.0f; //Temporary 1mAh for SoC Testing
     constexpr int NUM_CELLS = 4;
     constexpr int NUM_TEMPS = 2;
 

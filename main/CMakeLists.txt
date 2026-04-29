@@ -4,5 +4,7 @@ idf_component_register(SRCS "main.cpp"
                             "HAL/UartLink.cpp"
                             "HAL/Display.cpp"
                             "Services/NetManager.cpp"
+                            "Core/SoCEstimator.cpp"
+                            "HAL/Relays.cpp"
                        INCLUDE_DIRS "." "include" "Core" "HAL" "Services"
-                       REQUIRES nvs_flash esp_wifi mqtt esp_driver_usb_serial_jtag u8g2 driver)
+                       REQUIRES nvs_flash esp_wifi mqtt esp_driver_usb_serial_jtag u8g2 driver esp_netif esp_event)

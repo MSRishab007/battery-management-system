@@ -2,6 +2,7 @@
 #include "../include/DataTypes.h"
 #include "../include/Config.h"
 #include "../include/Secrets.h" // Holds your SSID, PASS, and MQTT URIs
+#include "esp_event.h"
 
 class NetManager {
 public:
@@ -29,7 +30,7 @@ private:
     // The Telemetry Task
     static void publishTask(void* pvParameters);
 
-    // Event Handlers (These run automatically in the background)
+    // Event Handlers 
     static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
     static void mqtt_event_handler(void* handler_args, esp_event_base_t base, int32_t event_id, void* event_data);
 };

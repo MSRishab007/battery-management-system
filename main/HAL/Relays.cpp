@@ -1,79 +1,73 @@
 #include "Relays.h"
+#include "esp_log.h"
 
-#ifdef ARDUINO
-#include <Arduino.h>
-
-constexpr int PIN_RELAY_CHARGE    = 15;
-constexpr int PIN_RELAY_DISCHARGE = 2;
-constexpr int PIN_RELAY_RECOVERY  = 4;
-constexpr int PIN_BALANCE_CELL_1  = 16;
-constexpr int PIN_BALANCE_CELL_2  = 17;
-constexpr int PIN_BALANCE_CELL_3  = 18;
-constexpr int PIN_BALANCE_CELL_4  = 19; 
-
-const int BALANCE_PINS[NUM_CELLS] = {
-    PIN_BALANCE_CELL_1, PIN_BALANCE_CELL_2, 
-    PIN_BALANCE_CELL_3, PIN_BALANCE_CELL_4
-};
-#endif
+static const char* TAG = "RELAYS";
 
 
-#ifndef ARDUINO
-bool Relays::mockChargePin = false;
-bool Relays::mockDischargePin = false;
-bool Relays::mockRecoveryPin = false;
-bool Relays::mockBalancePins[NUM_CELLS] = {false};
-#endif
+#define HARDWARE_ACTIVE 0 
+
+// GPIO Pin Definitions
+#define PIN_RELAY_CHARGE    GPIO_NUM_15
+#define PIN_RELAY_DISCHARGE GPIO_NUM_2
+#define PIN_RELAY_RECOVERY  GPIO_NUM_4
+#define PIN_BALANCE_1       GPIO_NUM_16
+#define PIN_BALANCE_2       GPIO_NUM_17
+#define PIN_BALANCE_3       GPIO_NUM_18
+#define PIN_BALANCE_4       GPIO_NUM_19
 
 void Relays::init() {
-#ifdef ARDUINO
-    Serial.println("   -> [RELAYS] HARDWARE AIR-GAPPED. Pins protected.");
+    if (!HARDWARE_ACTIVE) {
+        ESP_LOGW(TAG, "Hardware Air-Gapped. Relay pins disabled to protect USB Serial.");
+        return;
+    }
+
+    ESP_LOGI(TAG, "Configuring Physical Relay & Balance GPIOs...");
+
+    // Create a bitmask of all our output pins
+    uint64_t pin_mask = (1ULL << PIN_RELAY_CHARGE) | 
+                        (1ULL << PIN_RELAY_DISCHARGE) | 
+                        (1ULL << PIN_RELAY_RECOVERY) | 
+                        (1ULL << PIN_BALANCE_1) | 
+                        (1ULL << PIN_BALANCE_2) | 
+                        (1ULL << PIN_BALANCE_3) | 
+                        (1ULL << PIN_BALANCE_4);
+
+    gpio_config_t io_conf = {};
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    io_conf.mode = GPIO_MODE_OUTPUT;
+    io_conf.pin_bit_mask = pin_mask;
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
     
-    // =========================================================
-    // PHYSICAL PINS DISABLED TO PREVENT USB SHORT-CIRCUIT
-    // =========================================================
-    /*
-    pinMode(PIN_RELAY_CHARGE, OUTPUT);
-    pinMode(PIN_RELAY_DISCHARGE, OUTPUT);
-    pinMode(PIN_RELAY_RECOVERY, OUTPUT);
-    for(int i = 0; i < NUM_CELLS; i++) {
-        pinMode(BALANCE_PINS[i], OUTPUT);
-    }
-    digitalWrite(PIN_RELAY_CHARGE, LOW);
-    digitalWrite(PIN_RELAY_DISCHARGE, LOW);
-    digitalWrite(PIN_RELAY_RECOVERY, LOW);
-    for(int i = 0; i < NUM_CELLS; i++) {
-        digitalWrite(BALANCE_PINS[i], LOW);
-    }
-    */
-#else
-    mockChargePin = false;
-    mockDischargePin = false;
-    mockRecoveryPin = false;
-    for(int i = 0; i < NUM_CELLS; i++) mockBalancePins[i] = false;
-#endif
+    ESP_ERROR_CHECK(gpio_config(&io_conf));
+
+    // Ensure all relays and balancers default to OFF (0V) on boot
+    gpio_set_level(PIN_RELAY_CHARGE, 0);
+    gpio_set_level(PIN_RELAY_DISCHARGE, 0);
+    gpio_set_level(PIN_RELAY_RECOVERY, 0);
+    gpio_set_level(PIN_BALANCE_1, 0);
+    gpio_set_level(PIN_BALANCE_2, 0);
+    gpio_set_level(PIN_BALANCE_3, 0);
+    gpio_set_level(PIN_BALANCE_4, 0);
 }
 
-void Relays::update(const BmsRecord& record) {
-#ifdef ARDUINO
-    // HARDWARE COMMANDS COMMENTED OUT. 
-    // We only read the variables into the void to keep the compiler happy.
-    
-    /*
-    digitalWrite(PIN_RELAY_CHARGE, record.cmdChargeRelay ? HIGH : LOW);
-    digitalWrite(PIN_RELAY_DISCHARGE, record.cmdDischargeRelay ? HIGH : LOW);
-    digitalWrite(PIN_RELAY_RECOVERY, record.cmdRecoveryRelay ? HIGH : LOW);
-    
-    for(int i = 0; i < NUM_CELLS; i++) {
-        digitalWrite(BALANCE_PINS[i], record.balanceEnables[i] ? HIGH : LOW);
+void Relays::update(BmsRecord& record) {
+    if (!HARDWARE_ACTIVE) return;
+
+    // Snapshot the logic states
+    if (xSemaphoreTake(record.lock, pdMS_TO_TICKS(10)) == pdTRUE) {
+        
+        // Drive Main Relays
+        gpio_set_level(PIN_RELAY_CHARGE, record.cmdChargeRelay ? 1 : 0);
+        gpio_set_level(PIN_RELAY_DISCHARGE, record.cmdDischargeRelay ? 1 : 0);
+        gpio_set_level(PIN_RELAY_RECOVERY, record.cmdRecoveryRelay ? 1 : 0);
+
+        // Drive Cell Balancers
+        gpio_set_level(PIN_BALANCE_1, record.balanceEnables[0] ? 1 : 0);
+        gpio_set_level(PIN_BALANCE_2, record.balanceEnables[1] ? 1 : 0);
+        gpio_set_level(PIN_BALANCE_3, record.balanceEnables[2] ? 1 : 0);
+        gpio_set_level(PIN_BALANCE_4, record.balanceEnables[3] ? 1 : 0);
+
+        xSemaphoreGive(record.lock);
     }
-    */
-#else
-    mockChargePin = record.cmdChargeRelay;
-    mockDischargePin = record.cmdDischargeRelay;
-    mockRecoveryPin = record.cmdRecoveryRelay;
-    for(int i = 0; i < NUM_CELLS; i++) {
-        mockBalancePins[i] = record.balanceEnables[i];
-    }
-#endif
 }

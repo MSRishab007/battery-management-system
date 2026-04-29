@@ -65,10 +65,8 @@ def main():
     
     try:
         while True:
-            # --- EDIT THESE VALUES TO TEST YOUR FAULT LOGIC ---
-            # Right now, v1 is set to 4.3 which WILL trigger a HARD FAULT
             v1, v2, v3, v4 = 3.9, 3.9, 3.9, 3.9
-            current = 2.5
+            current = -5
             t1, t2 = 30.0, 31.0
             charger = 1 # 1 = Connected, 0 = Disconnected
 

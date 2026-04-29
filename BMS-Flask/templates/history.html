@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BMS Historical Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-bg: #1e1e1e;
+            --text-main: #ffffff;
+            --text-muted: #a0a0a0;
+            --accent: #a29bfe;
+            --danger: #ff4757;
+            --border: #333333;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+
+        .nav-btn {
+            background-color: transparent;
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        .nav-btn:hover {
+            background-color: var(--accent);
+            color: black;
+        }
+
+        .controls-bar {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+
+        select, button {
+            background-color: #2a2a2a;
+            color: white;
+            border: 1px solid var(--border);
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        button:hover { border-color: var(--accent); }
+
+        .panel {
+            background-color: var(--panel-bg);
+            border-radius: 10px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-container {
+            flex-grow: 1;
+            position: relative;
+            min-height: 500px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>BMS Historical Analysis</h1>
+        <a href="/" class="nav-btn">⬅ Back to Live Dashboard</a>
+    </div>
+
+    <div class="controls-bar">
+        <label style="color: var(--text-muted);">Data Points to Load:</label>
+        <select id="limit-select">
+            <option value="50">Last 50</option>
+            <option value="200" selected>Last 200</option>
+            <option value="500">Last 500</option>
+            <option value="1000">Last 1000</option>
+        </select>
+        <button onclick="loadHistory()">🔄 Refresh Data</button>
+    </div>
+
+    <div class="panel">
+        <h2 id="chart-title">Historical Trends</h2>
+        <div class="chart-container">
+            <canvas id="historyChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const ctx = document.getElementById('historyChart').getContext('2d');
+        let historyChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: [], datasets: [] },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                scales: {
+                    x: { grid: { color: '#333' } },
+                    yVolts: { 
+                        type: 'linear', position: 'left', 
+                        title: { display: true, text: 'Voltage / Current', color: '#fff' },
+                        grid: { color: '#444' } 
+                    },
+                    ySoc: { 
+                        type: 'linear', position: 'right', 
+                        min: 0, max: 100,
+                        title: { display: true, text: 'State of Charge (%)', color: '#a29bfe' },
+                        grid: { drawOnChartArea: false } // Prevent grid clash
+                    }
+                },
+                plugins: {
+                    legend: { labels: { color: '#fff' } }
+                }
+            }
+        });
+
+        function loadHistory() {
+            const limit = document.getElementById('limit-select').value;
+            document.getElementById('chart-title').innerText = `Historical Trends (Loading...)`;
+
+            fetch(`/api/history?limit=${limit}`)
+                .then(response => response.json())
+                .then(json => {
+                    if (json.status !== "success") return;
+                    
+                    const data = json.data;
+                    document.getElementById('chart-title').innerText = `Historical Trends (${data.length} records)`;
+
+                    // Parse data columns
+                    const labels = data.map(row => {
+                        // Extract just the Time from the Datetime string
+                        let d = new Date(row.timestamp + 'Z'); 
+                        return d.toLocaleTimeString();
+                    });
+
+                    const packVolts = data.map(row => row.pack_voltage);
+                    const socs = data.map(row => row.soc);
+                    const currents = data.map(row => row.current);
+
+                    // Rebuild Chart
+                    historyChart.data.labels = labels;
+                    historyChart.data.datasets = [
+                        {
+                            label: 'Pack Voltage (V)',
+                            data: packVolts,
+                            borderColor: '#00d2ff',
+                            yAxisID: 'yVolts',
+                            tension: 0.2,
+                            pointRadius: 1
+                        },
+                        {
+                            label: 'Current (A)',
+                            data: currents,
+                            borderColor: '#ff4757',
+                            yAxisID: 'yVolts',
+                            tension: 0.2,
+                            pointRadius: 1
+                        },
+                        {
+                            label: 'State of Charge (%)',
+                            data: socs,
+                            borderColor: '#a29bfe',
+                            backgroundColor: 'rgba(162, 155, 254, 0.1)',
+                            fill: true,
+                            yAxisID: 'ySoc',
+                            tension: 0.2,
+                            pointRadius: 1
+                        }
+                    ];
+                    
+                    historyChart.update();
+                })
+                .catch(err => console.error("Failed to load history:", err));
+        }
+
+        // Load data automatically when page opens
+        window.onload = loadHistory;
+    </script>
+</body>
+</html>

@@ -6,6 +6,7 @@
 #include "mqtt_client.h"
 #include <string.h>
 #include <time.h>
+#include "esp_event.h"
 
 static const char* TAG = "NETWORK";
 
@@ -34,7 +35,7 @@ void NetManager::startTask(BmsRecord* record) {
 // =================================================================
 // WIFI EVENT HANDLER (Background Connection Management)
 // =================================================================
-void NetManager::wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
+void NetManager::wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)  {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
         ESP_LOGI(TAG, "WiFi Started, connecting to %s...", Secrets::WIFI_SSID);
@@ -76,22 +77,26 @@ void NetManager::mqtt_event_handler(void* handler_args, esp_event_base_t base, i
             break;
             
         case MQTT_EVENT_DATA:
-            // WE RECEIVED A COMMAND FROM THE SERVER!
-            ESP_LOGI(TAG, "MQTT Message Received!");
+            // Safely print the exact topic and payload using %.*s (because they aren't null-terminated!)
+            ESP_LOGI(TAG, "=== Incoming MQTT Message ===");
+            ESP_LOGI(TAG, "Topic: %.*s", event->topic_len, event->topic);
+            ESP_LOGI(TAG, "Payload: %.*s", event->data_len, event->data);
             
             // 1. Ensure it's exactly the topic we want
-            if (strncmp(event->topic, Secrets::TOPIC_SUB_CMD, event->topic_len) == 0) {
+            if (event->topic_len == strlen(Secrets::TOPIC_SUB_CMD) &&
+                strncmp(event->topic, Secrets::TOPIC_SUB_CMD, event->topic_len) == 0) {
                 
-                // 2. Check if the payload says "RESET"
-                if (strncmp(event->data, "RESET", 5) == 0) {
+                // 2. Check if the payload starts with "RESET" (ignoring trailing newlines/spaces)
+                if (event->data_len >= 5 && strncmp(event->data, "RESET", 5) == 0) {
                     ESP_LOGW(TAG, ">>> SERVER COMMAND: RESET FAULTS <<<");
                     
-                    // Take the lock and safely erase the faults!
                     if (xSemaphoreTake(bmsData->lock, pdMS_TO_TICKS(100)) == pdTRUE) {
                         bmsData->faultFlags = FAULT_NONE;
-                        bmsData->currentState = STATE_BOOT; // Force a reboot evaluation
+                        bmsData->currentState = STATE_BOOT; 
                         xSemaphoreGive(bmsData->lock);
                     }
+                } else {
+                    ESP_LOGW(TAG, "Unrecognized command received on Sub Topic.");
                 }
             }
             break;
@@ -111,9 +116,8 @@ void NetManager::initWiFi() {
 
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, &instance_any_id));
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &wifi_event_handler, NULL, &instance_got_ip));
-
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, (esp_event_handler_t)&wifi_event_handler, NULL, &instance_any_id));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, (esp_event_handler_t)&wifi_event_handler, NULL, &instance_got_ip));
     wifi_config_t wifi_config = {};
     strcpy((char*)wifi_config.sta.ssid, Secrets::WIFI_SSID);
     strcpy((char*)wifi_config.sta.password, Secrets::WIFI_PASS);
@@ -141,7 +145,7 @@ void NetManager::initMQTT() {
     // mqtt_cfg.credentials.authentication.password = Secrets::MQTT_PASS;
 
     mqttClient = esp_mqtt_client_init(&mqtt_cfg);
-    esp_mqtt_client_register_event((esp_mqtt_client_handle_t)mqttClient, MQTT_EVENT_ANY, mqtt_event_handler, NULL);
+    esp_mqtt_client_register_event((esp_mqtt_client_handle_t)mqttClient, MQTT_EVENT_ANY, (esp_event_handler_t)mqtt_event_handler, NULL);
     esp_mqtt_client_start((esp_mqtt_client_handle_t)mqttClient);
 }
 

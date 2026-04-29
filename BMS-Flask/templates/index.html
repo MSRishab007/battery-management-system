@@ -3,93 +3,135 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BMS Master Control</title>
+    <title>Battery Management System Dashboard and Controller</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        /* Sleek Modern "Slate" Color Palette */
         :root {
-            --bg-color: #121212;
-            --panel-bg: #1e1e1e;
-            --text-main: #ffffff;
-            --text-muted: #a0a0a0;
-            --accent: #00d2ff;
-            --accent-alt: #a29bfe;
-            --danger: #ff4757;
-            --warning: #ffa502;
-            --success: #2ed573;
-            --border: #333333;
+            --bg-color: #0f172a;        /* Deep slate background */
+            --panel-bg: #1e293b;        /* Lighter slate for panels */
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;          /* Light blue */
+            --accent-alt: #818cf8;      /* Indigo */
+            --danger: #f43f5e;          /* Rose red */
+            --warning: #fbbf24;         /* Amber */
+            --success: #10b981;         /* Emerald green */
+            --border: #334155;
         }
-
+        /* Number Input Styling */
+        input[type=number] {
+            width: 65px;
+            background: var(--bg-color);
+            color: var(--accent);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 4px 6px;
+            text-align: right;
+            font-weight: bold;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        input[type=number]:focus { outline: none; border-color: var(--accent); }
+        
+        /* Remove the up/down arrows from number inputs for a cleaner look */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-main);
             margin: 0;
             padding: 20px;
             display: flex;
             flex-direction: column;
-            height: 100vh;
+            min-height: 100vh;
         }
 
-        h1, h2, h3 { margin-top: 0; }
+        h1, h2, h3 { margin-top: 0; font-weight: 600; letter-spacing: 0.5px; }
+        h2 { font-size: 1.25rem; margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px;}
 
+        /* Header Navigation */
         .header {
             display: flex; justify-content: space-between; align-items: center;
-            padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 20px;
-        }
-        .nav-btn {
-            background-color: transparent;
-            color: var(--accent);
-            border: 1px solid var(--accent);
-            padding: 8px 16px;
-            border-radius: 20px;
-            cursor: pointer;
-            text-decoration: none;
-            font-weight: bold;
-            transition: 0.2s;
-            font-size: 14px;
+            padding-bottom: 15px; margin-bottom: 20px;
         }
 
-        .nav-btn:hover { background-color: var(--accent); color: black; }
+        .header h1 { margin: 0; color: var(--text-main); text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+
+        .nav-btn {
+            background-color: transparent; color: var(--accent);
+            border: 1px solid var(--accent); padding: 8px 16px;
+            border-radius: 8px; cursor: pointer; text-decoration: none;
+            font-weight: 600; transition: all 0.2s ease; font-size: 14px;
+        }
+        .nav-btn:hover { background-color: var(--accent); color: #000; box-shadow: 0 0 10px rgba(56, 189, 248, 0.3); }
 
         .status-badge {
-            padding: 8px 16px; border-radius: 20px; background-color: var(--success);
-            color: black; font-weight: bold;
+            padding: 8px 16px; border-radius: 8px; background-color: var(--success);
+            color: white; font-weight: bold; font-size: 14px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            letter-spacing: 0.5px;
         }
 
+        /* Grid Layout */
         .dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; flex-grow: 1; }
-        .panel { background-color: var(--panel-bg); border-radius: 10px; padding: 20px; border: 1px solid var(--border); }
+        .panel { 
+            background-color: var(--panel-bg); border-radius: 12px; padding: 25px; 
+            border: 1px solid var(--border); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); 
+        }
 
-        /* Stats Grid */
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin-bottom: 20px; }
-        .stat-box { background-color: #2a2a2a; padding: 15px; border-radius: 8px; text-align: center; }
-        .stat-value { font-size: 22px; font-weight: bold; color: var(--accent); margin: 10px 0 5px 0; }
-        .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; }
+        /* Stats Grid - Widened minmax to fix overflow */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .stat-box { 
+            background-color: var(--bg-color); padding: 15px 10px; border-radius: 10px; 
+            text-align: center; border: 1px solid var(--border);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .stat-value { font-size: 20px; font-weight: bold; color: var(--accent); margin: 8px 0 2px 0; }
+        .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
 
-        /* Preset Buttons */
-        .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-        button { background-color: #2a2a2a; color: var(--text-main); border: 1px solid var(--border); padding: 10px; border-radius: 6px; cursor: pointer; transition: all 0.2s; font-weight: 600; font-size: 13px; }
-        button:hover { background-color: #3a3a3a; border-color: var(--accent); }
-        button.btn-danger:hover { background-color: var(--danger); color: white; border-color: var(--danger); }
-        button.btn-warning:hover { background-color: var(--warning); color: black; border-color: var(--warning); }
-        button.btn-success:hover { background-color: var(--success); color: black; border-color: var(--success); }
+        /* Modern Outline Buttons */
+        .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 25px; }
+        button { 
+            background-color: transparent; border: 1px solid var(--border); padding: 12px; 
+            border-radius: 8px; cursor: pointer; transition: all 0.2s ease; 
+            font-weight: 600; font-size: 13px; color: var(--text-main);
+        }
+        
+        button.btn-success { border-color: var(--success); color: var(--success); }
+        button.btn-success:hover { background-color: var(--success); color: #fff; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2); }
+        
+        button.btn-warning { border-color: var(--warning); color: var(--warning); }
+        button.btn-warning:hover { background-color: var(--warning); color: #000; box-shadow: 0 4px 12px rgba(251, 191, 36, 0.2); }
+        
+        button.btn-danger { border-color: var(--danger); color: var(--danger); }
+        button.btn-danger:hover { background-color: var(--danger); color: #fff; box-shadow: 0 4px 12px rgba(244, 63, 94, 0.2); }
+
+        button.btn-reset { border-color: var(--accent); color: var(--accent); grid-column: span 2; margin-top: 5px; }
+        button.btn-reset:hover { background-color: var(--accent); color: #000; box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3); }
+
+        button.btn-submit { background-color: var(--accent-alt); color: #fff; border: none; width: 100%; padding: 14px; font-size: 14px; margin-top: 10px; }
+        button.btn-submit:hover { background-color: #6366f1; box-shadow: 0 4px 12px rgba(129, 140, 248, 0.4); }
 
         /* Custom Sliders */
-        .custom-sliders { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
-        .slider-group { display: flex; flex-direction: column; background: #2a2a2a; padding: 10px; border-radius: 6px; }
-        .slider-group label { font-size: 12px; color: var(--accent); display: flex; justify-content: space-between; margin-bottom: 5px; font-weight: bold;}
-        .slider-group span { color: white; }
-        input[type=range] { width: 100%; cursor: pointer; }
-        select { width: 100%; padding: 5px; background: #121212; color: white; border: 1px solid var(--border); border-radius: 4px;}
+        .custom-sliders { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .slider-group { display: flex; flex-direction: column; background: var(--bg-color); padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
+        .slider-group label { font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: 600;}
+        .slider-group span { color: var(--accent); font-weight: bold; }
+        
+        input[type=range] { width: 100%; cursor: pointer; accent-color: var(--accent); }
+        select { width: 100%; padding: 6px; background: var(--bg-color); color: white; border: 1px solid var(--border); border-radius: 4px; outline: none;}
+        select:focus { border-color: var(--accent); }
 
         /* Charts */
         .charts-wrapper { display: flex; flex-direction: column; gap: 20px; }
-        .chart-container { height: 250px; background-color: #2a2a2a; border-radius: 8px; padding: 10px; position: relative; }
+        .chart-container { height: 260px; background-color: var(--bg-color); border-radius: 10px; padding: 15px; border: 1px solid var(--border); }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <h1>BMS Master Control</h1>
+        <h1>Battery Management System Dashboard</h1>
         <div style="display: flex; gap: 15px; align-items: center;">
             <a href="/history" class="nav-btn">View Historical Data</a>
             <div class="status-badge" id="conn-status">MQTT Connected</div>
@@ -117,11 +159,12 @@
 
         <div class="panel">
             <h2>Test Bench Presets</h2>
-<div class="preset-grid">
-                <button class="btn-success" onclick="sendCommand('preset', 'normal_idle')">Normal Idle (3.9V)</button>
-                <button class="btn-success" onclick="sendCommand('preset', 'normal_charge')">Normal Charging (-5A)</button>
-                <button class="btn-success" style="grid-column: span 2;" onclick="sendCommand('preset', 'normal_discharge')">Normal Discharging (15A)</button>
-                
+            <div class="preset-grid">
+                <button class="btn-success" onclick="sendCommand('preset', 'normal_idle')">Idle (3.9V)</button>
+                <button class="btn-success" onclick="sendCommand('preset', 'storage_mode')">Storage (3.8V)</button>
+                <button class="btn-success" onclick="sendCommand('preset', 'normal_charge')">Charging (5A)</button>
+                <button class="btn-success" onclick="sendCommand('preset', 'normal_discharge')">Discharging (-15A)</button>
+
                 <button class="btn-warning" onclick="sendCommand('preset', 'fault_imbalance')">Cell 3 Imbalance</button>
                 <button class="btn-warning" onclick="sendCommand('preset', 'deep_discharge')">50A Heavy Load</button>
 
@@ -130,37 +173,84 @@
                 <button class="btn-danger" onclick="sendCommand('preset', 'fault_ot')">Trigger Overtemp</button>
                 <button class="btn-danger" onclick="sendCommand('preset', 'extreme_cold')">Trigger Under-temp</button>
                 
-                <button style="grid-column: span 2; margin-top: 10px; border-color: var(--accent);" onclick="sendCommand('raw', 'RESET')">
-                    ⟲ HARD RESET ESP32 FAULTS
-                </button>
+                <button class="btn-reset" onclick="sendCommand('raw', 'RESET')">⟲ HARD RESET ESP32 FAULTS</button>
             </div>
-
-            <hr style="border-color: var(--border); margin: 20px 0;">
 
             <h2>Custom Simulator</h2>
             <div class="custom-sliders">
-                <div class="slider-group"><label>Cell 1 (V) <span id="out-v1">3.90</span></label><input type="range" id="sim-v1" min="2.0" max="4.5" step="0.01" value="3.9" oninput="updateVal(this, 'out-v1')"></div>
-                <div class="slider-group"><label>Cell 2 (V) <span id="out-v2">3.90</span></label><input type="range" id="sim-v2" min="2.0" max="4.5" step="0.01" value="3.9" oninput="updateVal(this, 'out-v2')"></div>
-                <div class="slider-group"><label>Cell 3 (V) <span id="out-v3">3.90</span></label><input type="range" id="sim-v3" min="2.0" max="4.5" step="0.01" value="3.9" oninput="updateVal(this, 'out-v3')"></div>
-                <div class="slider-group"><label>Cell 4 (V) <span id="out-v4">3.90</span></label><input type="range" id="sim-v4" min="2.0" max="4.5" step="0.01" value="3.9" oninput="updateVal(this, 'out-v4')"></div>
+                <div class="slider-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <label style="margin: 0;">Cell 1 (V)</label>
+                        <input type="number" id="num-v1" min="2.0" max="4.5" step="0.01" value="3.90" oninput="syncVal('num-v1', 'sim-v1')">
+                    </div>
+                    <input type="range" id="sim-v1" min="2.0" max="4.5" step="0.01" value="3.90" oninput="syncVal('sim-v1', 'num-v1')">
+                </div>
                 
-                <div class="slider-group"><label>Current (A) <span id="out-c">0.0</span></label><input type="range" id="sim-c" min="-100" max="100" step="0.1" value="0.0" oninput="updateVal(this, 'out-c')"></div>
-                <div class="slider-group"><label>Temp 1 (°C) <span id="out-t1">25.0</span></label><input type="range" id="sim-t1" min="-20" max="85" step="1" value="25" oninput="updateVal(this, 'out-t1')"></div>
+                <div class="slider-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <label style="margin: 0;">Cell 2 (V)</label>
+                        <input type="number" id="num-v2" min="2.0" max="4.5" step="0.01" value="3.90" oninput="syncVal('num-v2', 'sim-v2')">
+                    </div>
+                    <input type="range" id="sim-v2" min="2.0" max="4.5" step="0.01" value="3.90" oninput="syncVal('sim-v2', 'num-v2')">
+                </div>
+
+                <div class="slider-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <label style="margin: 0;">Cell 3 (V)</label>
+                        <input type="number" id="num-v3" min="2.0" max="4.5" step="0.01" value="3.90" oninput="syncVal('num-v3', 'sim-v3')">
+                    </div>
+                    <input type="range" id="sim-v3" min="2.0" max="4.5" step="0.01" value="3.90" oninput="syncVal('sim-v3', 'num-v3')">
+                </div>
+
+                <div class="slider-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <label style="margin: 0;">Cell 4 (V)</label>
+                        <input type="number" id="num-v4" min="2.0" max="4.5" step="0.01" value="3.90" oninput="syncVal('num-v4', 'sim-v4')">
+                    </div>
+                    <input type="range" id="sim-v4" min="2.0" max="4.5" step="0.01" value="3.90" oninput="syncVal('sim-v4', 'num-v4')">
+                </div>
                 
-                <div class="slider-group"><label>Temp 2 (°C) <span id="out-t2">25.0</span></label><input type="range" id="sim-t2" min="-20" max="85" step="1" value="25" oninput="updateVal(this, 'out-t2')"></div>
-                <div class="slider-group"><label>Charger</label>
+                <div class="slider-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <label style="margin: 0;">Current (A)</label>
+                        <input type="number" id="num-c" min="-100" max="100" step="0.1" value="0.0" oninput="syncVal('num-c', 'sim-c')">
+                    </div>
+                    <input type="range" id="sim-c" min="-100" max="100" step="0.1" value="0.0" oninput="syncVal('sim-c', 'num-c')">
+                </div>
+
+                <div class="slider-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <label style="margin: 0;">Temp 1 (°C)</label>
+                        <input type="number" id="num-t1" min="-20" max="85" step="1" value="25" oninput="syncVal('num-t1', 'sim-t1')">
+                    </div>
+                    <input type="range" id="sim-t1" min="-20" max="85" step="1" value="25" oninput="syncVal('sim-t1', 'num-t1')">
+                </div>
+                
+                <div class="slider-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <label style="margin: 0;">Temp 2 (°C)</label>
+                        <input type="number" id="num-t2" min="-20" max="85" step="1" value="25" oninput="syncVal('num-t2', 'sim-t2')">
+                    </div>
+                    <input type="range" id="sim-t2" min="-20" max="85" step="1" value="25" oninput="syncVal('sim-t2', 'num-t2')">
+                </div>
+
+                <div class="slider-group">
+                    <label style="margin-bottom: 9px;">Charger Status</label>
                     <select id="sim-chg">
                         <option value="0">Disconnected</option>
                         <option value="1">Connected</option>
                     </select>
                 </div>
             </div>
-            <button style="width: 100%; border-color: var(--accent-alt); background: var(--border);" onclick="sendCustom()">🚀 SEND CUSTOM STATE</button>
+            <button class="btn-submit" onclick="sendCustom()">SEND CUSTOM STATE TO HARDWARE</button>
         </div>
     </div>
 
     <script>
         // --- CHART SETUP ---
+        Chart.defaults.color = '#94a3b8'; // Global text color for charts
+        Chart.defaults.font.family = "'Segoe UI', sans-serif";
+
         const maxDataPoints = 30; 
         
         // Voltage Chart
@@ -170,21 +260,21 @@
             data: {
                 labels: [], 
                 datasets: [
-                    { label: 'Cell 1', borderColor: '#ff4757', data: [], tension: 0.3, pointRadius: 0 },
-                    { label: 'Cell 2', borderColor: '#2ed573', data: [], tension: 0.3, pointRadius: 0 },
-                    { label: 'Cell 3', borderColor: '#1e90ff', data: [], tension: 0.3, pointRadius: 0 },
-                    { label: 'Cell 4', borderColor: '#ffa502', data: [], tension: 0.3, pointRadius: 0 }
+                    { label: 'Cell 1', borderColor: '#f43f5e', data: [], tension: 0.3, pointRadius: 0, borderWidth: 2 },
+                    { label: 'Cell 2', borderColor: '#10b981', data: [], tension: 0.3, pointRadius: 0, borderWidth: 2 },
+                    { label: 'Cell 3', borderColor: '#38bdf8', data: [], tension: 0.3, pointRadius: 0, borderWidth: 2 },
+                    { label: 'Cell 4', borderColor: '#fbbf24', data: [], tension: 0.3, pointRadius: 0, borderWidth: 2 }
                 ]
             },
-            options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { y: { min: 2.0, max: 4.5, grid: { color: '#444' } }, x: { grid: { color: '#444' } } }, plugins: { legend: { labels: { color: '#fff' } } } }
+            options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { y: { min: 2.0, max: 4.5, grid: { color: '#334155' } }, x: { grid: { color: '#334155' } } }, plugins: { legend: { labels: { color: '#f8fafc' } } } }
         });
 
         // SoC Chart
         const ctxSoc = document.getElementById('socChart').getContext('2d');
         const chartSoc = new Chart(ctxSoc, {
             type: 'line',
-            data: { labels: [], datasets: [{ label: 'State of Charge (%)', borderColor: '#a29bfe', backgroundColor: 'rgba(162, 155, 254, 0.2)', fill: true, data: [], tension: 0.3, pointRadius: 0 }] },
-            options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { y: { min: 0, max: 100, grid: { color: '#444' } }, x: { display: false } }, plugins: { legend: { labels: { color: '#fff' } } } }
+            data: { labels: [], datasets: [{ label: 'State of Charge (%)', borderColor: '#818cf8', backgroundColor: 'rgba(129, 140, 248, 0.2)', fill: true, data: [], tension: 0.3, pointRadius: 0, borderWidth: 2 }] },
+            options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { y: { min: 0, max: 100, grid: { color: '#334155' } }, x: { display: false } }, plugins: { legend: { labels: { color: '#f8fafc' } } } }
         });
 
         // --- UI UPDATER ---
@@ -200,7 +290,9 @@
                     document.getElementById('val-soc').innerText = data.soc.toFixed(1) + ' %';
                     document.getElementById('val-t1').innerText = data.t1.toFixed(1) + ' °C';
                     document.getElementById('val-t2').innerText = data.t2.toFixed(1) + ' °C';
-                    document.getElementById('val-chg').innerText = data.charger ? "CONNECTED" : "OFF";
+                    
+                    // Fixed the overflow issue by using a shorter word "ACTIVE"
+                    document.getElementById('val-chg').innerText = data.charger ? "ACTIVE" : "OFF";
                     document.getElementById('val-chg').style.color = data.charger ? "var(--success)" : "var(--text-muted)";
 
                     const now = new Date().toLocaleTimeString('en-US', { hour12: false, hour: "numeric", minute: "numeric", second: "numeric" });
@@ -224,7 +316,7 @@
                     if (data.faults > 0) {
                         badge.style.backgroundColor = 'var(--danger)'; badge.style.color = 'white'; badge.innerText = 'FAULT: 0x' + data.faults.toString(16).toUpperCase();
                     } else {
-                        badge.style.backgroundColor = 'var(--success)'; badge.style.color = 'black'; badge.innerText = 'SYSTEM NORMAL';
+                        badge.style.backgroundColor = 'var(--success)'; badge.style.color = 'white'; badge.innerText = 'SYSTEM NORMAL';
                     }
                 })
                 .catch(err => console.log("Waiting for data..."));
@@ -237,8 +329,10 @@
         }
 
         // Custom Slider Logic
-        function updateVal(slider, textId) {
-            document.getElementById(textId).innerText = parseFloat(slider.value).toFixed(slider.step < 1 ? 2 : 1);
+        // Two-way synchronization between slider and number box
+        function syncVal(sourceId, targetId) {
+            const sourceVal = document.getElementById(sourceId).value;
+            document.getElementById(targetId).value = sourceVal;
         }
 
         function sendCustom() {

@@ -184,9 +184,11 @@ def handle_command():
         if action == 'normal_idle':
             sim_state.update({"v1": 3.9, "v2": 3.9, "v3": 3.9, "v4": 3.9, "c": 0.0, "t1": 25.0, "t2": 25.0, "charger": 0})
         elif action == 'normal_charge':
-            sim_state.update({"v1": 3.9, "v2": 3.9, "v3": 3.9, "v4": 3.9, "c": -5.0, "t1": 30.0, "t2": 30.0, "charger": 1})
+            sim_state.update({"v1": 3.9, "v2": 3.9, "v3": 3.9, "v4": 3.9, "c": 5.0, "t1": 30.0, "t2": 30.0, "charger": 1})
         elif action == 'normal_discharge':
-            sim_state.update({"v1": 3.8, "v2": 3.8, "v3": 3.8, "v4": 3.8, "c": 15.0, "t1": 32.0, "t2": 32.0, "charger": 0})
+            sim_state.update({"v1": 3.8, "v2": 3.8, "v3": 3.8, "v4": 3.8, "c": -15.0, "t1": 32.0, "t2": 32.0, "charger": 0})
+        elif action == 'storage_mode':
+            sim_state.update({"v1": 3.8, "v2": 3.8, "v3": 3.8, "v4": 3.8, "c": 0.0, "t1": 25.0, "t2": 25.0, "charger": 0})
         elif action == 'fault_imbalance':
             sim_state.update({"v1": 3.8, "v2": 3.8, "v3": 4.3, "v4": 3.8}) # Cell 3 spiked
         elif action == 'deep_discharge':

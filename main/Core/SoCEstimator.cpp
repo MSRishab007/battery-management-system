@@ -42,7 +42,7 @@ void SoCEstimator::update(BmsRecord& record) {
 
         // THE FIX: Subtract the delta (Assuming positive current = Discharge)
         // If your hardware uses negative current for discharge, change this back to +=
-        record.stateOfCharge -= deltaSoC; 
+        record.stateOfCharge += deltaSoC; 
 
         // Clamp to physical boundaries
         if (record.stateOfCharge > 100.0f) record.stateOfCharge = 100.0f;

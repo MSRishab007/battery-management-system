@@ -22,7 +22,7 @@ namespace Config {
     constexpr float VOLTAGE_CRIT_MIN = 2.50f;  // HARD: Instant Kill (Prevent cell death)
 
     // --- Current Limits ---
-    constexpr float CURRENT_CRIT_CHARGE    = 6.0f;   // HARD: Charger runaway
+    constexpr float CURRENT_CRIT_CHARGE    =  6.0f;   // HARD: Charger runaway
     constexpr float CURRENT_WARN_CHARGE    = 5.0f;   // SOFT: Throttle charger
     
     constexpr float CURRENT_CRIT_DISCHARGE = -30.0f; // HARD: Short circuit / Massive load
